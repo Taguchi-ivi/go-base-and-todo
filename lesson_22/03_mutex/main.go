@@ -1,7 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"sync"
+	"time"
 )
 
 type value struct {
@@ -118,4 +120,46 @@ func main() {
 	// wg.Wait()
 
 	// mutex,RWMutex
+	// mutexは読み込みも書き込みもlockがかかる
+	// RWMutexは読み込みの制御と書き込みの制御を分けることができる
+	// mutexを使うと、読み込みも書き込みもlockがかかるので、最大5*2=10秒かかる
+	// RWMutexを使い、一部の読み込みをlockしないようにすると、最大5+1(同時に行われる)=6秒で終わる
+	var count int
+	// var lock sync.Mutex
+	var lock sync.RWMutex
+	var wg sync.WaitGroup
+
+	increment := func(wg *sync.WaitGroup, l sync.Locker) {
+		l.Lock()
+		defer l.Unlock()
+		defer wg.Done()
+
+		fmt.Println("increment")
+		count++
+		time.Sleep(1 * time.Second)
+	}
+
+	read := func(wg *sync.WaitGroup, l sync.Locker) {
+		l.Lock()
+		defer l.Unlock()
+		defer wg.Done()
+
+		fmt.Println("read")
+		time.Sleep(1 * time.Second)
+	}
+
+	start := time.Now()
+	for i := 0; i < 5; i++ {
+		wg.Add(1)
+		go increment(&wg, &lock)
+	}
+
+	for i := 0; i < 5; i++ {
+		wg.Add(1)
+		// go read(&wg, &lock)
+		go read(&wg, lock.RLocker())
+	}
+	wg.Wait()
+	end := time.Now()
+	fmt.Println("end.sub(start):", end.Sub(start))
 }
